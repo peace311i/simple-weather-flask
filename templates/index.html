@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🌦 シンプル天気</title>
+
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js');
+    }
+  </script>
+
+  <style>
+    body{font-family:system-ui, -apple-system, "Segoe UI", Roboto; margin:20px; line-height:1.6}
+    header{display:flex;align-items:center;gap:8px}
+    .card{border:1px solid #ddd; border-radius:12px; padding:16px; margin:10px 0; background:#fff}
+    .row{display:grid; gap:12px}
+    @media(min-width:600px){ .row{grid-template-columns:repeat(2,1fr)} }
+    @media(min-width:900px){ .row{grid-template-columns:repeat(4,1fr)} }
+    input[type=text]{padding:8px; width:68%}
+    button{padding:8px 12px; border-radius:8px; border:1px solid #ccc; background:#f5f5f5}
+    .muted{color:#666; font-size:0.9em}
+    .tile-head{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+    .temp{font-size:1.1em; font-weight:600}
+    .em{font-size:1.4em}
+    .icon{width:48px;height:48px;image-rendering:-webkit-optimize-contrast}
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0">🌦 シンプル天気</h1>
+  </header>
+
+  <form method="post" style="margin-top:12px">
+    <input type="text" name="city" value="{{ city }}" placeholder="都市名（例: Tokyo,JP）" />
+    <button type="submit">更新</button>
+  </form>
+
+  {% if error %}
+    <p style="color:#c00">{{ error }}</p>
+  {% endif %}
+
+  {% if data %}
+    <h2 style="margin:12px 0">📍 {{ data.city.name }}</h2>
+    <p class="muted">3時間ごとの24時間予報</p>
+
+    <div class="row">
+      {% set emoji_map = {
+        'Thunderstorm':'⛈️','Drizzle':'🌦️','Rain':'🌧️','Snow':'🌨️',
+        'Clear':'☀️','Clouds':'☁️','Mist':'🌫️','Smoke':'🌫️','Haze':'🌫️',
+        'Dust':'🌫️','Fog':'🌫️','Sand':'🌫️','Ash':'🌫️','Squall':'🌬️','Tornado':'🌪️'
+      } %}
+
+      {% for item in data.list %}
+        {% set main = item.weather[0].main %}
+        {% set emj = emoji_map.get(main, '🌡️') %}
+        {% set icon = item.weather[0].icon %}
+        <div class="card">
+          <div class="tile-head">
+            <span class="em">{{ emj }}</span>
+            <div>
+              <div><strong>{{ item.local_dt_txt }}</strong></div>
+              <div class="muted">{{ item.weather[0].description }}</div>
+            </div>
+            <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+          </div>
+          <div class="temp">気温：{{ item.main.temp }} ℃（体感 {{ item.main.feels_like }} ℃）</div>
+          <div>湿度：💧 {{ item.main.humidity }} %　風速：🌬️ {{ item.wind.speed }} m/s</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</body>
+</html>
