@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🌍 現在地の天気</title>
 
+  <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -17,127 +18,257 @@
   </script>
 
   <style>
-    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto;margin:20px;line-height:1.6}
-    header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    /* Safari はみ出し対策 & 共通レイアウト */
+    :root { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: inherit; }
+    body{
+      font-family: system-ui,-apple-system,"Segoe UI",Roboto;
+      margin: 0; padding: 16px;
+      line-height: 1.6; background:#fafafa;
+    }
+    .container{ max-width: 980px; margin: 0 auto; }
+    header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
     .wrap{display:grid;gap:16px}
-    .card{border:1px solid #ddd;border-radius:12px;padding:16px;background:#fff}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:#fff}
     .row{display:grid;gap:12px}
-    .scroll-x{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
-    .tile{min-width:160px;border:1px solid #eee;border-radius:10px;padding:12px;background:#fff;flex:0 0 auto}
+    .tile{ border:1px solid #eee;border-radius:10px;padding:12px;background:#fff }
     .muted{color:#666;font-size:0.9em}
-    .em{font-size:1.4em}
     .icon{width:48px;height:48px;vertical-align:middle}
     .temp{font-size:1.1em;font-weight:600}
+    button{cursor:pointer}
     @media(min-width:800px){ .row{grid-template-columns:repeat(2,1fr)} }
   </style>
 </head>
 <body>
-  <header>
-    <h1 style="margin:0">🌍 現在地の天気</h1>
-    <a href="/" style="margin-left:auto">← 都市名で見る</a>
-  </header>
+  <div class="container">
+    <header>
+      <h1 style="margin:0">🌍 現在地の天気</h1>
+      <a href="/" style="margin-left:auto">← 都市名で見る</a>
+    </header>
 
-  {% if error %}
-    <p style="color:#c00">{{ error }}</p>
-  {% endif %}
-
-  {% if data %}
-    {% set emoji_map = {
-      'Thunderstorm':'⛈️','Drizzle':'🌦️','Rain':'🌧️','Snow':'🌨️',
-      'Clear':'☀️','Clouds':'☁️','Mist':'🌫️','Smoke':'🌫️','Haze':'🌫️',
-      'Dust':'🌫️','Fog':'🌫️','Sand':'🌫️','Ash':'🌫️','Squall':'🌬️','Tornado':'🌪️'
-    } %}
-
-    <div class="wrap">
-      <!-- 現在の天気 -->
-      <div class="card">
-        <h2>📍 {{ place }}（{{ data.current.local_dt_txt }}）</h2>
-        {% set cwx = data.current.weather[0] %}
-        {% set main = cwx.main %}
-        {% set emj = emoji_map.get(main, '🌡️') %}
-        {% set icon = cwx.icon %}
-        <div class="temp">
-          {{ emj }} {{ cwx.description }}　
-          {{ data.current.temp|default(0)|round(1) }} ℃
-        </div>
-        <div>
-          体感：{{ data.current.feels_like|default(0)|round(1) }} ℃　
-          湿度：💧{{ data.current.humidity|default(0) }} %　
-          風：🌬️{{ data.current.wind_speed|default(0)|round(1) }} m/s
-        </div>
-        <div class="muted">
-          UV: {{ data.current.uvi|default('–') }}　
-          気圧: {{ data.current.pressure|default('–') }} hPa　
-          雲量: {{ data.current.clouds|default('–') }} %
-        </div>
-        <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+    <!-- お気に入り保存パネル -->
+    <div class="card" id="favPanel">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button type="button" onclick="saveFav()">☆ 現在地を保存</button>
+        <div class="muted">よく使う地点を保存してワンタップで開けます</div>
       </div>
-
-      <div class="row">
-        <!-- 48時間予報（横スクロール） -->
-        <div class="card">
-          <h3>🕒 48時間予報</h3>
-          <div class="scroll-x">
-            {% for h in data.hourly[:48] %}
-              {# One Call形式と/forecast形式に両対応 #}
-              {% set temp = (h.temp if h.temp is defined else (h.get('main', {}).get('temp'))) %}
-              {% set feels = (h.feels_like if h.feels_like is defined else (h.get('main', {}).get('feels_like'))) %}
-              {% set windspd = (h.wind_speed if h.wind_speed is defined else (h.get('wind', {}).get('speed'))) %}
-              {% set popv = (h.get('pop', 0)) %}
-              {% set w0 = (h.weather[0] if h.weather is defined and h.weather and h.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
-              {% set emj = emoji_map.get(w0.main, '🌡️') %}
-              {% set icon = w0.icon %}
-              <div class="tile">
-                <div><strong>{{ h.local_dt_txt }}</strong></div>
-                <div>{{ emj }} {{ w0.description }}</div>
-                <div class="temp">
-                  {{ temp|default(0)|round(0) }} ℃（体感 {{ feels|default(0)|round(0) }} ℃）
-                </div>
-                <div>
-                  💧{{ (popv * 100)|round(0) }} %　
-                  🌬️{{ windspd|default(0)|round(1) }} m/s
-                </div>
-                <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- 日次要約（最大5日・昇順） -->
-        <div class="card">
-          <h3>📅 5日要約</h3>
-          <div class="row">
-            {% for d in data.daily %}
-              {% set w0 = (d.weather[0] if d.weather is defined and d.weather and d.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
-              {% set emj = emoji_map.get(w0.main, '🌡️') %}
-              {% set icon = w0.icon %}
-              {% set popv = d.get('pop', 0) %}
-              <div class="tile">
-                <div><strong>{{ d.local_dt_txt }}</strong></div>
-                <div>{{ emj }} {{ w0.description }}</div>
-                <div class="temp">⬆ {{ d.temp.tmax|default('–') }} ℃　⬇ {{ d.temp.tmin|default('–') }} ℃</div>
-                <div>💧{{ (popv * 100)|round(0) }} %　🌬️{{ d.get('wind_speed', 0)|round(1) }} m/s</div>
-                <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
-                <div class="muted">代表時刻: {{ d.rep_time|default('—') }}</div>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      {% if data.alerts %}
-        <div class="card">
-          <h3>🚨 気象アラート</h3>
-          <ul>
-            {% for a in data.alerts %}
-              <li><strong>{{ a.event }}</strong> — {{ a.sender_name }}（{{ a.local_start_txt }}〜{{ a.local_end_txt }}）
-                <div class="muted">{{ a.description }}</div>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
+      <div class="muted" id="favList" style="margin-top:8px"></div>
     </div>
-  {% endif %}
+
+    {% if error %}
+      <p style="color:#c00">{{ error }}</p>
+    {% endif %}
+
+    {% if data %}
+      {% set emoji_map = {
+        'Thunderstorm':'⛈️','Drizzle':'🌦️','Rain':'🌧️','Snow':'🌨️',
+        'Clear':'☀️','Clouds':'☁️','Mist':'🌫️','Smoke':'🌫️','Haze':'🌫️',
+        'Dust':'🌫️','Fog':'🌫️','Sand':'🌫️','Ash':'🌫️','Squall':'🌬️','Tornado':'🌪️'
+      } %}
+
+      <div class="wrap">
+        <!-- 現在の天気 -->
+        <div class="card">
+          <h2>📍 {{ place }}（{{ data.current.local_dt_txt }}）</h2>
+          {% set cwx = data.current.weather[0] %}
+          {% set main = cwx.main %}
+          {% set emj = emoji_map.get(main, '🌡️') %}
+          {% set icon = cwx.icon %}
+          <div class="temp">
+            {{ emj }} {{ cwx.description }}　
+            {{ data.current.temp|default(0)|round(1) }} ℃
+          </div>
+          <div>
+            体感：{{ data.current.feels_like|default(0)|round(1) }} ℃　
+            湿度：💧{{ data.current.humidity|default(0) }} %　
+            風：🌬️{{ data.current.wind_speed|default(0)|round(1) }} m/s
+          </div>
+          <div class="muted">
+            UV: {{ data.current.uvi|default('–') }}　
+            気圧: {{ data.current.pressure|default('–') }} hPa　
+            雲量: {{ data.current.clouds|default('–') }} %
+          </div>
+          <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+        </div>
+
+        <div class="row">
+          <!-- 48時間予報（縦並び） -->
+          <div class="card">
+            <h3>🕒 48時間予報</h3>
+            <div class="row">
+              {% for h in data.hourly[:48] %}
+                {# One Call形式と/forecast形式に両対応 #}
+                {% set temp = (h.temp if h.temp is defined else (h.get('main', {}).get('temp'))) %}
+                {% set feels = (h.feels_like if h.feels_like is defined else (h.get('main', {}).get('feels_like'))) %}
+                {% set windspd = (h.wind_speed if h.wind_speed is defined else (h.get('wind', {}).get('speed'))) %}
+                {% set popv = (h.get('pop', 0)) %}
+                {% set w0 = (h.weather[0] if h.weather is defined and h.weather and h.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
+                {% set icon = w0.icon %}
+                {% set emj = emoji_map.get(w0.main, '🌡️') %}
+                <div class="tile">
+                  <div><strong>{{ h.local_dt_txt }}</strong></div>
+                  <div>{{ emj }} {{ w0.description }}</div>
+                  <div class="temp">
+                    {{ temp|default(0)|round(0) }} ℃（体感 {{ feels|default(0)|round(0) }} ℃）
+                  </div>
+                  <div>
+                    💧{{ (popv * 100)|round(0) }} %　
+                    🌬️{{ windspd|default(0)|round(1) }} m/s
+                  </div>
+                  <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- 日次要約（最大5日・昇順） -->
+          <div class="card">
+            <h3>📅 5日要約</h3>
+            {% if data.daily|length == 0 %}
+              <div class="muted">日次要約データがありません。</div>
+            {% else %}
+              <div class="row">
+                {% for d in data.daily %}
+                  {% set w0 = (d.weather[0] if d.weather is defined and d.weather and d.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
+                  {% set emj = emoji_map.get(w0.main, '🌡️') %}
+                  {% set icon = w0.icon %}
+                  {% set popv = d.get('pop', 0) %}
+                  <div class="tile">
+                    <div><strong>{{ d.local_dt_txt }}</strong></div>
+                    <div>{{ emj }} {{ w0.description }}</div>
+                    <div class="temp">⬆ {{ d.temp.tmax|default('–') }} ℃　⬇ {{ d.temp.tmin|default('–') }} ℃</div>
+                    <div>💧{{ (popv * 100)|round(0) }} %　🌬️{{ d.get('wind_speed', 0)|round(1) }} m/s</div>
+                    <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+                    <div class="muted">代表時刻: {{ d.rep_time|default('—') }}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- JMA（気象庁）アラート -->
+        <div class="card">
+          <h3>🚨 気象庁アラート（都道府県を選択）</h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="prefSelect"></select>
+            <button type="button" onclick="loadJma()">読み込み</button>
+            <span class="muted">※データ: 気象庁公開JSON</span>
+          </div>
+          <div id="jmaAlerts" class="row" style="margin-top:12px"></div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- 複数地点保存（localStorage）/ JMAアラート用スクリプト -->
+  <script>
+    const place = {{ place|tojson }};
+    const lat = {{ lat|tojson }};
+    const lon = {{ lon|tojson }};
+    const key = "weather_favs_v1";
+
+    function loadFavs(){
+      try { return JSON.parse(localStorage.getItem(key)) || []; }
+      catch(e){ return []; }
+    }
+    function saveFav(){
+      const favs = loadFavs();
+      if(!favs.find(f => f.lat===lat && f.lon===lon)){
+        favs.push({name: place, lat, lon});
+        localStorage.setItem(key, JSON.stringify(favs));
+        renderFavs();
+        alert("保存しました");
+      } else {
+        alert("すでに保存済みです");
+      }
+    }
+    function removeFav(i){
+      const favs = loadFavs();
+      favs.splice(i,1);
+      localStorage.setItem(key, JSON.stringify(favs));
+      renderFavs();
+    }
+    function renderFavs(){
+      const favs = loadFavs();
+      const wrap = document.getElementById('favList');
+      if(!wrap) return;
+      if(favs.length===0){ wrap.textContent = "保存された地点はありません。"; return; }
+      wrap.innerHTML = favs.map((f,i)=>(
+        `<a href="/onecall?lat=${f.lat}&lon=${f.lon}">📍 ${f.name}</a>
+         <button onclick="removeFav(${i})" style="margin-left:6px">削除</button>`
+      )).join("　");
+    }
+    renderFavs();
+
+    // JMA（気象庁）アラート
+    async function fetchAreas(){
+      const res = await fetch("https://www.jma.go.jp/bosai/common/const/area.json");
+      return res.json();
+    }
+    function buildPrefOptions(areaJson){
+      const offices = areaJson.offices; // 例: { "130000": { "name": "東京都", ... }, ...}
+      const sel = document.getElementById("prefSelect");
+      sel.innerHTML = "";
+      Object.keys(offices).sort().forEach(code=>{
+        const opt = document.createElement("option");
+        opt.value = code; opt.textContent = offices[code].name;
+        sel.appendChild(opt);
+      });
+      // デフォルトを東京(130000)に
+      if (offices["130000"]) sel.value = "130000";
+    }
+    async function loadJma(){
+      const code = document.getElementById("prefSelect").value;
+      const url = `https://www.jma.go.jp/bosai/warning/data/warning/${code}.json`;
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error("取得に失敗しました");
+        const data = await res.json();
+        renderJma(data);
+      }catch(e){
+        alert(e.message || "取得に失敗しました");
+      }
+    }
+    function renderJma(data){
+      const wrap = document.getElementById("jmaAlerts");
+      wrap.innerHTML = "";
+      const head = (data.headline && data.headline[0]) ? data.headline[0].headlineText : "発表状況";
+      const h3 = document.createElement("div");
+      h3.className = "muted"; h3.textContent = head;
+      wrap.appendChild(h3);
+
+      if(!data.areaTypes || data.areaTypes.length===0){
+        wrap.appendChild(document.createTextNode("警報・注意報はありません。"));
+        return;
+      }
+      data.areaTypes.forEach(at=>{
+        const sec = document.createElement("div");
+        sec.className = "tile";
+        const title = document.createElement("div");
+        title.innerHTML = `<strong>${at.codeName || at.areaType}</strong>`;
+        sec.appendChild(title);
+
+        if(at.areas && at.areas.length){
+          const ul = document.createElement("ul");
+          at.areas.slice(0, 40).forEach(a=>{
+            const li = document.createElement("li");
+            const names = a.name || a.code;
+            const kindsSrc = a.warningCodes || a.kinds || [];
+            const kinds = kindsSrc.map(k=> (k.name || k.code)).join("、");
+            li.textContent = `${names}: ${kinds || '（該当なし）'}`;
+            ul.appendChild(li);
+          });
+          sec.appendChild(ul);
+        } else {
+          const p = document.createElement("div");
+          p.textContent = "（該当なし）";
+          sec.appendChild(p);
+        }
+        wrap.appendChild(sec);
+      });
+    }
+    (async ()=>{ try{ const areaJson = await fetchAreas(); buildPrefOptions(areaJson);}catch(e){} })();
+  </script>
 </body>
 </html>
