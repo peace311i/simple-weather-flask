@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🌍 現在地の天気</title>
+
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto;margin:20px;line-height:1.6}
+    header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .wrap{display:grid;gap:16px}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px;background:#fff}
+    .row{display:grid;gap:12px}
+    .scroll-x{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+    .tile{min-width:160px;border:1px solid #eee;border-radius:10px;padding:12px;background:#fff;flex:0 0 auto}
+    .muted{color:#666;font-size:0.9em}
+    .em{font-size:1.4em}
+    .icon{width:48px;height:48px;vertical-align:middle}
+    .temp{font-size:1.1em;font-weight:600}
+    @media(min-width:800px){ .row{grid-template-columns:repeat(2,1fr)} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0">🌍 現在地の天気</h1>
+    <a href="/" style="margin-left:auto">← 都市名で見る</a>
+  </header>
+
+  {% if error %}
+    <p style="color:#c00">{{ error }}</p>
+  {% endif %}
+
+  {% if data %}
+    {% set emoji_map = {
+      'Thunderstorm':'⛈️','Drizzle':'🌦️','Rain':'🌧️','Snow':'🌨️',
+      'Clear':'☀️','Clouds':'☁️','Mist':'🌫️','Smoke':'🌫️','Haze':'🌫️',
+      'Dust':'🌫️','Fog':'🌫️','Sand':'🌫️','Ash':'🌫️','Squall':'🌬️','Tornado':'🌪️'
+    } %}
+
+    <div class="wrap">
+      <!-- 現在の天気 -->
+      <div class="card">
+        <h2>📍 {{ place }}（{{ data.current.local_dt_txt }}）</h2>
+        {% set main = data.current.weather[0].main %}
+        {% set emj = emoji_map.get(main, '🌡️') %}
+        {% set icon = data.current.weather[0].icon %}
+        <div class="temp">{{ emj }} {{ data.current.weather[0].description }}　{{ data.current.temp|round(1) }} ℃</div>
+        <div>体感：{{ data.current.feels_like|round(1) }} ℃　湿度：💧{{ data.current.humidity }} %　風：🌬️{{ data.current.wind_speed }} m/s</div>
+        <div class="muted">UV: {{ data.current.uvi|default('–') }}　気圧: {{ data.current.pressure }} hPa　雲量: {{ data.current.clouds }} %</div>
+        <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+      </div>
+
+      <div class="row">
+        <!-- 48時間予報（横スクロール） -->
+        <div class="card">
+          <h3>🕒 48時間予報</h3>
+          <div class="scroll-x">
+            {% for h in data.hourly[:48] %}
+              {% set main = h.weather[0].main %}
+              {% set emj = emoji_map.get(main, '🌡️') %}
+              {% set icon = h.weather[0].icon %}
+              <div class="tile">
+                <div><strong>{{ h.local_dt_txt }}</strong></div>
+                <div>{{ emj }} {{ h.weather[0].description }}</div>
+                <div class="temp">{{ h.temp|round(0) }} ℃（体感 {{ h.feels_like|round(0) }} ℃）</div>
+                <div>💧{{ (h.pop * 100)|round(0) }} %　🌬️{{ h.wind_speed|round(1) }} m/s</div>
+                <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- 7日間予報 -->
+        <div class="card">
+          <h3>📅 7日間予報</h3>
+          <div class="row">
+            {% for d in data.daily[:7] %}
+              {% set main = d.weather[0].main %}
+              {% set emj = emoji_map.get(main, '🌡️') %}
+              {% set icon = d.weather[0].icon %}
+              <div class="tile">
+                <div><strong>{{ d.local_dt_txt }}</strong></div>
+                <div>{{ emj }} {{ d.weather[0].description }}</div>
+                <div class="temp">⬆ {{ d.temp.tmax }} ℃　⬇ {{ d.temp.tmin }} ℃</div>
+                <div>💧{{ (d.pop * 100)|round(0) }} %　🌬️{{ d.wind_speed|round(1) }} m/s</div>
+                <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {% if data.alerts %}
+        <div class="card">
+          <h3>🚨 気象アラート</h3>
+          <ul>
+            {% for a in data.alerts %}
+              <li><strong>{{ a.event }}</strong> — {{ a.sender_name }}（{{ a.start | int | datetime | default('') }}）
+                <div class="muted">{{ a.description }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</body>
+</html>

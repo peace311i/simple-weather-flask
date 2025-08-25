@@ -40,6 +40,28 @@
     <h1 style="margin:0">🌦 シンプル天気</h1>
   </header>
 
+<button type="button" onclick="useGeo()">📍 現在地の天気（今+48h+7日）</button>
+<script>
+  function useGeo() {
+    if (!navigator.geolocation) {
+      alert("位置情報が利用できません");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lon = pos.coords.longitude.toFixed(6);
+        // /onecall に遷移（サーバ側でレンダリング）
+        location.href = `/onecall?lat=${lat}&lon=${lon}`;
+      },
+      err => {
+        alert("位置情報の取得に失敗しました: " + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    );
+  }
+</script>
+
   <form method="post" style="margin-top:12px">
     <input type="text" name="city" value="{{ city }}" placeholder="都市名（例: Tokyo,JP）" />
     <button type="submit">更新</button>
