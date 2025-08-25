@@ -52,12 +52,24 @@
       <!-- 現在の天気 -->
       <div class="card">
         <h2>📍 {{ place }}（{{ data.current.local_dt_txt }}）</h2>
-        {% set main = data.current.weather[0].main %}
+        {% set cwx = data.current.weather[0] %}
+        {% set main = cwx.main %}
         {% set emj = emoji_map.get(main, '🌡️') %}
-        {% set icon = data.current.weather[0].icon %}
-        <div class="temp">{{ emj }} {{ data.current.weather[0].description }}　{{ data.current.temp|round(1) }} ℃</div>
-        <div>体感：{{ data.current.feels_like|round(1) }} ℃　湿度：💧{{ data.current.humidity }} %　風：🌬️{{ data.current.wind_speed }} m/s</div>
-        <div class="muted">UV: {{ data.current.uvi|default('–') }}　気圧: {{ data.current.pressure }} hPa　雲量: {{ data.current.clouds }} %</div>
+        {% set icon = cwx.icon %}
+        <div class="temp">
+          {{ emj }} {{ cwx.description }}　
+          {{ data.current.temp|default(0)|round(1) }} ℃
+        </div>
+        <div>
+          体感：{{ data.current.feels_like|default(0)|round(1) }} ℃　
+          湿度：💧{{ data.current.humidity|default(0) }} %　
+          風：🌬️{{ data.current.wind_speed|default(0)|round(1) }} m/s
+        </div>
+        <div class="muted">
+          UV: {{ data.current.uvi|default('–') }}　
+          気圧: {{ data.current.pressure|default('–') }} hPa　
+          雲量: {{ data.current.clouds|default('–') }} %
+        </div>
         <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
       </div>
 
@@ -67,34 +79,46 @@
           <h3>🕒 48時間予報</h3>
           <div class="scroll-x">
             {% for h in data.hourly[:48] %}
-              {% set main = h.weather[0].main %}
-              {% set emj = emoji_map.get(main, '🌡️') %}
-              {% set icon = h.weather[0].icon %}
+              {# One Call形式と/forecast形式に両対応 #}
+              {% set temp = (h.temp if h.temp is defined else (h.get('main', {}).get('temp'))) %}
+              {% set feels = (h.feels_like if h.feels_like is defined else (h.get('main', {}).get('feels_like'))) %}
+              {% set windspd = (h.wind_speed if h.wind_speed is defined else (h.get('wind', {}).get('speed'))) %}
+              {% set popv = (h.get('pop', 0)) %}
+              {% set w0 = (h.weather[0] if h.weather is defined and h.weather and h.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
+              {% set emj = emoji_map.get(w0.main, '🌡️') %}
+              {% set icon = w0.icon %}
               <div class="tile">
                 <div><strong>{{ h.local_dt_txt }}</strong></div>
-                <div>{{ emj }} {{ h.weather[0].description }}</div>
-                <div class="temp">{{ h.temp|round(0) }} ℃（体感 {{ h.feels_like|round(0) }} ℃）</div>
-                <div>💧{{ (h.pop * 100)|round(0) }} %　🌬️{{ h.wind_speed|round(1) }} m/s</div>
+                <div>{{ emj }} {{ w0.description }}</div>
+                <div class="temp">
+                  {{ temp|default(0)|round(0) }} ℃（体感 {{ feels|default(0)|round(0) }} ℃）
+                </div>
+                <div>
+                  💧{{ (popv * 100)|round(0) }} %　
+                  🌬️{{ windspd|default(0)|round(1) }} m/s
+                </div>
                 <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
               </div>
             {% endfor %}
           </div>
         </div>
 
-        <!-- 7日間予報 -->
+        <!-- 日次要約（最大5日・昇順） -->
         <div class="card">
-          <h3>📅 7日間予報</h3>
+          <h3>📅 5日要約</h3>
           <div class="row">
-            {% for d in data.daily[:7] %}
-              {% set main = d.weather[0].main %}
-              {% set emj = emoji_map.get(main, '🌡️') %}
-              {% set icon = d.weather[0].icon %}
+            {% for d in data.daily %}
+              {% set w0 = (d.weather[0] if d.weather is defined and d.weather and d.weather[0] is defined else {'main':'','description':'','icon':'01d'}) %}
+              {% set emj = emoji_map.get(w0.main, '🌡️') %}
+              {% set icon = w0.icon %}
+              {% set popv = d.get('pop', 0) %}
               <div class="tile">
                 <div><strong>{{ d.local_dt_txt }}</strong></div>
-                <div>{{ emj }} {{ d.weather[0].description }}</div>
-                <div class="temp">⬆ {{ d.temp.tmax }} ℃　⬇ {{ d.temp.tmin }} ℃</div>
-                <div>💧{{ (d.pop * 100)|round(0) }} %　🌬️{{ d.wind_speed|round(1) }} m/s</div>
+                <div>{{ emj }} {{ w0.description }}</div>
+                <div class="temp">⬆ {{ d.temp.tmax|default('–') }} ℃　⬇ {{ d.temp.tmin|default('–') }} ℃</div>
+                <div>💧{{ (popv * 100)|round(0) }} %　🌬️{{ d.get('wind_speed', 0)|round(1) }} m/s</div>
                 <img class="icon" alt="" src="https://openweathermap.org/img/wn/{{ icon }}@2x.png">
+                <div class="muted">代表時刻: {{ d.rep_time|default('—') }}</div>
               </div>
             {% endfor %}
           </div>
@@ -106,7 +130,7 @@
           <h3>🚨 気象アラート</h3>
           <ul>
             {% for a in data.alerts %}
-              <li><strong>{{ a.event }}</strong> — {{ a.sender_name }}（{{ a.start | int | datetime | default('') }}）
+              <li><strong>{{ a.event }}</strong> — {{ a.sender_name }}（{{ a.local_start_txt }}〜{{ a.local_end_txt }}）
                 <div class="muted">{{ a.description }}</div>
               </li>
             {% endfor %}
