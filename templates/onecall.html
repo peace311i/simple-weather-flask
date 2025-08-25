@@ -46,7 +46,7 @@
       <a href="/" style="margin-left:auto">← 都市名で見る</a>
     </header>
 
-    <!-- お気に入り保存パネル -->
+    <!-- お気に入り保存パネル（複数地点保存） -->
     <div class="card" id="favPanel">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" onclick="saveFav()">☆ 現在地を保存</button>
@@ -146,22 +146,11 @@
             {% endif %}
           </div>
         </div>
-
-        <!-- JMA（気象庁）アラート -->
-        <div class="card">
-          <h3>🚨 気象庁アラート（都道府県を選択）</h3>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="prefSelect"></select>
-            <button type="button" onclick="loadJma()">読み込み</button>
-            <span class="muted">※データ: 気象庁公開JSON</span>
-          </div>
-          <div id="jmaAlerts" class="row" style="margin-top:12px"></div>
-        </div>
       </div>
     {% endif %}
   </div>
 
-  <!-- 複数地点保存（localStorage）/ JMAアラート用スクリプト -->
+  <!-- 複数地点保存（localStorage） -->
   <script>
     const place = {{ place|tojson }};
     const lat = {{ lat|tojson }};
@@ -200,75 +189,6 @@
       )).join("　");
     }
     renderFavs();
-
-    // JMA（気象庁）アラート
-    async function fetchAreas(){
-      const res = await fetch("https://www.jma.go.jp/bosai/common/const/area.json");
-      return res.json();
-    }
-    function buildPrefOptions(areaJson){
-      const offices = areaJson.offices; // 例: { "130000": { "name": "東京都", ... }, ...}
-      const sel = document.getElementById("prefSelect");
-      sel.innerHTML = "";
-      Object.keys(offices).sort().forEach(code=>{
-        const opt = document.createElement("option");
-        opt.value = code; opt.textContent = offices[code].name;
-        sel.appendChild(opt);
-      });
-      // デフォルトを東京(130000)に
-      if (offices["130000"]) sel.value = "130000";
-    }
-    async function loadJma(){
-      const code = document.getElementById("prefSelect").value;
-      const url = `https://www.jma.go.jp/bosai/warning/data/warning/${code}.json`;
-      try{
-        const res = await fetch(url);
-        if(!res.ok) throw new Error("取得に失敗しました");
-        const data = await res.json();
-        renderJma(data);
-      }catch(e){
-        alert(e.message || "取得に失敗しました");
-      }
-    }
-    function renderJma(data){
-      const wrap = document.getElementById("jmaAlerts");
-      wrap.innerHTML = "";
-      const head = (data.headline && data.headline[0]) ? data.headline[0].headlineText : "発表状況";
-      const h3 = document.createElement("div");
-      h3.className = "muted"; h3.textContent = head;
-      wrap.appendChild(h3);
-
-      if(!data.areaTypes || data.areaTypes.length===0){
-        wrap.appendChild(document.createTextNode("警報・注意報はありません。"));
-        return;
-      }
-      data.areaTypes.forEach(at=>{
-        const sec = document.createElement("div");
-        sec.className = "tile";
-        const title = document.createElement("div");
-        title.innerHTML = `<strong>${at.codeName || at.areaType}</strong>`;
-        sec.appendChild(title);
-
-        if(at.areas && at.areas.length){
-          const ul = document.createElement("ul");
-          at.areas.slice(0, 40).forEach(a=>{
-            const li = document.createElement("li");
-            const names = a.name || a.code;
-            const kindsSrc = a.warningCodes || a.kinds || [];
-            const kinds = kindsSrc.map(k=> (k.name || k.code)).join("、");
-            li.textContent = `${names}: ${kinds || '（該当なし）'}`;
-            ul.appendChild(li);
-          });
-          sec.appendChild(ul);
-        } else {
-          const p = document.createElement("div");
-          p.textContent = "（該当なし）";
-          sec.appendChild(p);
-        }
-        wrap.appendChild(sec);
-      });
-    }
-    (async ()=>{ try{ const areaJson = await fetchAreas(); buildPrefOptions(areaJson);}catch(e){} })();
   </script>
 </body>
 </html>
