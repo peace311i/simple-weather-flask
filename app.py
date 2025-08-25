@@ -9,7 +9,7 @@ load_dotenv()
 API_KEY = (os.getenv("OWM_API_KEY") or "").strip()
 DEFAULT_CITY = os.getenv("DEFAULT_CITY", "Tokyo,JP")
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="/static", static_folder="static")
 
 def fetch_weather(city: str):
     """OpenWeatherの5日/3時間予報を取得し、UTC→現地時間に変換した文字列を付与して返す"""
@@ -37,7 +37,7 @@ def fetch_weather(city: str):
         item["local_dt_txt"] = local_dt.strftime("%Y-%m-%d %H:%M")
 
     # ★ここで順序を逆にする
-    data["list"] = list(reversed(data["list"]))
+    # data["list"] = list(reversed(data["list"]))
     # もしくは: data["list"] = data["list"][::-1]
 
     return data
